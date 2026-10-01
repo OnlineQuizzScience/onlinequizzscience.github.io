@@ -204,6 +204,11 @@
                     <span>My Progress</span>
                 </button>
 
+                <button onclick="switchView('rank')" id="nav-rank" class="w-full text-left px-3.5 py-3 rounded-xl font-medium transition flex items-center gap-3 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 group">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition"><i class="fa-solid fa-trophy"></i></div>
+                    <span>Rank Board</span>
+                </button>
+
                 <button onclick="switchView('admin')" id="nav-admin" class="w-full text-left px-3.5 py-3 rounded-xl font-medium transition flex items-center gap-3 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 group">
                     <div class="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition"><i class="fa-solid fa-circle-plus"></i></div>
                     <span>Admin Creator</span>
@@ -421,7 +426,55 @@
             </div>
         </div>
 
-        <!-- 5. QUIZ PLAYER VIEW -->
+        <!-- 5. STUDENT RANK BOARD VIEW -->
+        <div id="view-rank" class="space-y-6 hidden">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div>
+                    <span class="px-3 py-1 bg-white/25 rounded-full text-xs font-semibold uppercase tracking-wider mb-2 inline-block">Student Leaderboard</span>
+                    <h2 class="text-2xl md:text-3xl font-extrabold">🏆 Rank Board</h2>
+                    <p class="text-amber-50 text-sm mt-1">See the highest scores achieved by students in each quiz.</p>
+                </div>
+                <div class="bg-white/15 backdrop-blur-md p-4 rounded-xl border border-white/25 min-w-[220px]">
+                    <label for="rank-quiz-select" class="block text-xs text-amber-50 mb-2 font-semibold">Select Quiz</label>
+                    <select id="rank-quiz-select" onchange="loadRankBoard()" class="w-full px-3 py-2 rounded-lg bg-white text-slate-800 text-sm font-semibold outline-none">
+                        <option value="">Choose a quiz...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Your Rank</p>
+                    <p id="rank-my-position" class="text-3xl font-extrabold text-brand-600 dark:text-brand-400 mt-2">—</p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Your Best Score</p>
+                    <p id="rank-my-score" class="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">—</p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <p class="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Students Ranked</p>
+                    <p id="rank-total-students" class="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2">—</p>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><i class="fa-solid fa-ranking-star text-amber-500"></i> Quiz Rankings</h3>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">Highest attempt per student</span>
+                </div>
+                <div id="rank-board-status" class="text-sm text-slate-500 dark:text-slate-400 py-3">Choose a quiz to view its rankings.</div>
+                <div class="overflow-x-auto">
+                    <table id="rank-board-table" class="hidden w-full text-left text-sm text-slate-600 dark:text-slate-300">
+                        <thead class="bg-slate-50 dark:bg-slate-700 text-xs uppercase font-semibold text-slate-700 dark:text-slate-200">
+                            <tr><th class="p-3 rounded-l-lg">Rank</th><th class="p-3">Student</th><th class="p-3">Best Score</th><th class="p-3 rounded-r-lg">Completed</th></tr>
+                        </thead>
+                        <tbody id="rank-board-body" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. QUIZ PLAYER VIEW -->
         <div id="view-player" class="hidden max-w-4xl mx-auto space-y-6">
             <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors duration-200">
                 <div>
@@ -831,11 +884,13 @@
         function setAdminVisibility(isAdmin) {
             const adminNav = document.getElementById('nav-admin');
             const progressNav = document.getElementById('nav-progress');
+            const rankNav = document.getElementById('nav-rank');
             const createButton = document.querySelector('button[onclick="openAdminCreateNew()"]');
             if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
             if (createButton) createButton.classList.toggle('hidden', !isAdmin);
             // Admin accounts use the Admin Center; student accounts use My Progress.
             if (progressNav) progressNav.classList.toggle('hidden', !!isAdmin);
+            if (rankNav) rankNav.classList.toggle('hidden', !!isAdmin);
         }
 
         async function loadPublishedQuizzes() {
@@ -1048,11 +1103,13 @@
 
         function switchView(viewName) {
             if (viewName === 'progress' && currentProfile?.role === 'admin') return;
+            if (viewName === 'rank' && (!currentSession?.user || currentProfile?.role === 'admin')) return;
             if (viewName === 'admin' && currentProfile?.role !== 'admin') return;
             document.getElementById('view-dashboard').classList.add('hidden');
             document.getElementById('view-library').classList.add('hidden');
             document.getElementById('view-store').classList.add('hidden');
             document.getElementById('view-progress').classList.add('hidden');
+            document.getElementById('view-rank').classList.add('hidden');
             document.getElementById('view-player').classList.add('hidden');
             document.getElementById('view-result').classList.add('hidden');
             document.getElementById('view-admin').classList.add('hidden');
@@ -1073,6 +1130,9 @@
             } else if (viewName === 'progress') {
                 document.getElementById('view-progress').classList.remove('hidden');
                 renderProgressAnalytics();
+            } else if (viewName === 'rank') {
+                document.getElementById('view-rank').classList.remove('hidden');
+                prepareRankBoard();
             } else if (viewName === 'player') {
                 document.getElementById('view-player').classList.remove('hidden');
             } else if (viewName === 'result') {
@@ -1215,6 +1275,111 @@
                     </div>
                 </div>
             `;
+        }
+
+        function prepareRankBoard() {
+            const select = document.getElementById('rank-quiz-select');
+            const previousValue = select.value;
+            select.innerHTML = '';
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = 'Choose a quiz...';
+            select.appendChild(placeholder);
+            (quizzes || []).forEach(quiz => {
+                const option = document.createElement('option');
+                option.value = quiz.id;
+                option.textContent = quiz.title || 'Untitled Quiz';
+                select.appendChild(option);
+            });
+            if (previousValue && (quizzes || []).some(q => String(q.id) === previousValue)) {
+                select.value = previousValue;
+            } else if (quizzes?.length) {
+                select.value = quizzes[0].id;
+            }
+            if (!quizzes?.length) {
+                setRankBoardMessage('No published quizzes are available yet.');
+                resetMyRankStats();
+                return;
+            }
+            loadRankBoard();
+        }
+
+        function setRankBoardMessage(message, isError = false) {
+            const status = document.getElementById('rank-board-status');
+            status.textContent = message;
+            status.className = `text-sm py-3 ${isError ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'}`;
+            document.getElementById('rank-board-table').classList.add('hidden');
+            document.getElementById('rank-board-body').replaceChildren();
+        }
+
+        function resetMyRankStats() {
+            document.getElementById('rank-my-position').textContent = '—';
+            document.getElementById('rank-my-score').textContent = '—';
+            document.getElementById('rank-total-students').textContent = '—';
+        }
+
+        async function loadRankBoard() {
+            const quizId = document.getElementById('rank-quiz-select').value;
+            resetMyRankStats();
+            if (!quizId) {
+                setRankBoardMessage('Choose a quiz to view its rankings.');
+                return;
+            }
+            if (!currentSession?.user || currentProfile?.role === 'admin') {
+                setRankBoardMessage('Please sign in with a student account to view rankings.', true);
+                return;
+            }
+            setRankBoardMessage('Loading rankings...');
+            try {
+                const { data, error } = await supabaseClient
+                    .from('quiz_best_scores')
+                    .select('rank,user_id,full_name,score,total_marks,percentage,completed_at')
+                    .eq('quiz_id', quizId)
+                    .order('rank', { ascending: true })
+                    .order('score', { ascending: false });
+                if (error) throw error;
+                const rows = data || [];
+                document.getElementById('rank-total-students').textContent = String(rows.length);
+                const mine = rows.find(row => row.user_id === currentSession.user.id);
+                if (mine) {
+                    document.getElementById('rank-my-position').textContent = `#${mine.rank}`;
+                    document.getElementById('rank-my-score').textContent = `${Number(mine.score)} / ${Number(mine.total_marks)}`;
+                }
+                if (!rows.length) {
+                    setRankBoardMessage('No students have completed this quiz yet.');
+                    return;
+                }
+                const tbody = document.getElementById('rank-board-body');
+                tbody.replaceChildren();
+                rows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.className = row.user_id === currentSession.user.id
+                        ? 'bg-brand-50 dark:bg-brand-900/25 font-semibold'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50';
+                    const rankCell = document.createElement('td');
+                    rankCell.className = 'p-3 font-bold text-amber-600 dark:text-amber-400';
+                    const rankNumber = Number(row.rank);
+                    rankCell.textContent = rankNumber === 1 ? '🥇 1' : rankNumber === 2 ? '🥈 2' : rankNumber === 3 ? '🥉 3' : String(rankNumber);
+                    const nameCell = document.createElement('td');
+                    nameCell.className = 'p-3 text-slate-900 dark:text-slate-100';
+                    nameCell.textContent = row.user_id === currentSession.user.id
+                        ? `${row.full_name || 'Student'} (You)` : (row.full_name || 'Student');
+                    const scoreCell = document.createElement('td');
+                    scoreCell.className = 'p-3 font-bold text-brand-600 dark:text-brand-400';
+                    scoreCell.textContent = `${Number(row.score)} / ${Number(row.total_marks)} (${Number(row.percentage).toFixed(1)}%)`;
+                    const dateCell = document.createElement('td');
+                    dateCell.className = 'p-3 text-xs';
+                    dateCell.textContent = row.completed_at ? new Date(row.completed_at).toLocaleDateString() : '—';
+                    tr.append(rankCell, nameCell, scoreCell, dateCell);
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('rank-board-status').textContent = `Showing ${rows.length} student${rows.length === 1 ? '' : 's'} · each student's highest score only.`;
+                document.getElementById('rank-board-status').className = 'text-xs text-slate-500 dark:text-slate-400';
+                document.getElementById('rank-board-table').classList.remove('hidden');
+            } catch (error) {
+                console.error('Rank board load:', error);
+                setRankBoardMessage(`Could not load rankings: ${error.message || 'Unknown error'}`, true);
+            }
         }
 
         function renderProgressAnalytics() {
