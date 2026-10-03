@@ -219,6 +219,11 @@
                     <span>My Progress</span>
                 </button>
 
+                <button onclick="switchView('student-rank')" id="nav-student-rank" class="w-full text-left px-3.5 py-3 rounded-xl font-medium transition flex items-center gap-3 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 group">
+                    <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition"><i class="fa-solid fa-ranking-star"></i></div>
+                    <span>Rank List</span>
+                </button>
+
                 <button onclick="switchView('admin')" id="nav-admin" class="w-full text-left px-3.5 py-3 rounded-xl font-medium transition flex items-center gap-3 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60 group">
                     <div class="w-8 h-8 rounded-lg bg-purple-500 text-white flex items-center justify-center text-sm shadow-sm group-hover:scale-105 transition"><i class="fa-solid fa-circle-plus"></i></div>
                     <span>Admin Creator</span>
@@ -350,6 +355,35 @@
             </div>
 
             <div id="library-quizzes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </div>
+
+        <!-- STUDENT RANK LIST VIEW -->
+        <div id="view-student-rank" class="space-y-6 hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100"><i class="fa-solid fa-ranking-star text-amber-500 mr-2"></i>Quiz Rank List</h2>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm">See how students ranked in each completed quiz.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="student-rank-quiz-select" onchange="loadStudentRankList()" class="min-w-0 w-full md:w-72 px-4 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                        <option value="">Select a quiz</option>
+                    </select>
+                    <button onclick="loadStudentRankList()" class="shrink-0 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl"><i class="fa-solid fa-rotate mr-1"></i> Refresh</button>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div id="student-rank-summary" class="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">Select a quiz to view its ranking.</div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-slate-600 dark:text-slate-300">
+                        <thead class="text-xs uppercase bg-slate-50 dark:bg-slate-700/60 text-slate-500 dark:text-slate-300">
+                            <tr><th class="px-4 py-3">Rank</th><th class="px-4 py-3">Student</th><th class="px-4 py-3">Score</th><th class="px-4 py-3">Percentage</th><th class="px-4 py-3">Completed</th></tr>
+                        </thead>
+                        <tbody id="student-rank-rows" class="divide-y divide-slate-100 dark:divide-slate-700">
+                            <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Select a quiz to view its ranking.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- 3. BOOK STORE VIEW -->
@@ -503,6 +537,7 @@
                 <div>
                     <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Quiz Completed Successfully!</h2>
                     <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Here is your performance breakdown & colorful downloadable PDF report</p>
+                    <p id="result-save-note" class="hidden text-sm font-semibold text-amber-700 dark:text-amber-300 mt-2 sinhala-text">මෙය පුහුණු Attempt එකකි. ලකුණු Database එකට සුරැකෙන්නේ නැත.</p>
                 </div>
 
                 <div class="grid grid-cols-3 gap-4 py-4 border-y border-slate-100 dark:border-slate-700">
@@ -527,7 +562,7 @@
                     <button onclick="window.print()" class="px-5 py-3 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
                         <i class="fa-solid fa-print"></i> Print Report View
                     </button>
-                    <button id="result-retry-button" onclick="restartCurrentQuiz()" class="hidden px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md transition">
+                    <button id="result-retry-button" onclick="restartCurrentQuiz()" class="px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md transition">
                         <i class="fa-solid fa-rotate-right mr-2"></i> Try Again
                     </button>
                     <button onclick="switchView('library')" class="px-5 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-xl transition">
@@ -826,6 +861,7 @@
         let timeLeft = 0;
         let quizStartTime = 0;
         let quizDurationSeconds = 0;
+        let currentQuizIsRetake = false;
 
         let tempQuestions = [];
         let editingQuizId = null;
@@ -880,11 +916,13 @@
         function setAdminVisibility(isAdmin) {
             const adminNav = document.getElementById('nav-admin');
             const progressNav = document.getElementById('nav-progress');
+            const studentRankNav = document.getElementById('nav-student-rank');
             const createButton = document.querySelector('button[onclick="openAdminCreateNew()"]');
             if (adminNav) adminNav.classList.toggle('hidden', !isAdmin);
             if (createButton) createButton.classList.toggle('hidden', !isAdmin);
             // Admin accounts use the Admin Center; student accounts use My Progress.
             if (progressNav) progressNav.classList.toggle('hidden', !!isAdmin);
+            if (studentRankNav) studentRankNav.classList.toggle('hidden', !!isAdmin);
         }
 
         async function loadPublishedQuizzes() {
@@ -1156,7 +1194,7 @@
             }
 
             const rankRows = data || [];
-            summary.textContent = `${rankRows.length} student(s) · Best attempt per student`;
+            summary.textContent = `${rankRows.length} student(s) · First attempt only`;
             if (!rankRows.length) {
                 rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No students have completed this quiz yet.</td></tr>';
                 return;
@@ -1177,16 +1215,74 @@
             }).join('');
         }
 
+        function populateStudentRankQuizSelect() {
+            const select = document.getElementById('student-rank-quiz-select');
+            if (!select) return;
+            const previous = select.value;
+            select.innerHTML = '<option value="">Select a quiz</option>' + (quizzes || []).map(q =>
+                `<option value="${q.id}">${escapeHTML(q.title)} · ${escapeHTML(q.subject)} · A/L ${escapeHTML(q.batch)}</option>`
+            ).join('');
+            if (previous && (quizzes || []).some(q => q.id === previous)) select.value = previous;
+            else if (quizzes?.length) select.value = quizzes[0].id;
+        }
+
+        async function loadStudentRankList() {
+            if (!currentSession?.user || currentProfile?.role === 'admin') return;
+            const select = document.getElementById('student-rank-quiz-select');
+            const rowsBox = document.getElementById('student-rank-rows');
+            const summary = document.getElementById('student-rank-summary');
+            if (!select || !rowsBox || !summary) return;
+            if (!select.options.length || select.options.length <= 1) populateStudentRankQuizSelect();
+            const quizId = select.value;
+            if (!quizId) {
+                rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No published quizzes available.</td></tr>';
+                summary.textContent = 'There are no published quizzes to display.';
+                return;
+            }
+            rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Loading rank list...</td></tr>';
+            summary.textContent = 'Loading student results...';
+            const { data, error } = await supabaseClient
+                .from('quiz_best_scores')
+                .select('rank,user_id,full_name,score,total_marks,percentage,completed_at')
+                .eq('quiz_id', quizId)
+                .order('rank', { ascending: true })
+                .order('score', { ascending: false });
+            if (error) {
+                rowsBox.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Could not load rank list: ${escapeHTML(error.message)}</td></tr>`;
+                summary.textContent = 'Rank list could not be loaded.';
+                return;
+            }
+            const rankRows = data || [];
+            summary.textContent = `${rankRows.length} student(s) · First attempt only`;
+            if (!rankRows.length) {
+                rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No students have completed this quiz yet.</td></tr>';
+                return;
+            }
+            rowsBox.innerHTML = rankRows.map(row => {
+                const completed = row.completed_at ? new Date(row.completed_at).toLocaleString() : '—';
+                const rankLabel = Number(row.rank) === 1 ? '🥇 1' : Number(row.rank) === 2 ? '🥈 2' : Number(row.rank) === 3 ? '🥉 3' : row.rank;
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                    <td class="px-4 py-3 font-bold whitespace-nowrap">${rankLabel}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">${escapeHTML(row.full_name || 'Student')}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">${escapeHTML(row.score)} / ${escapeHTML(row.total_marks)}</td>
+                    <td class="px-4 py-3 font-bold whitespace-nowrap">${escapeHTML(row.percentage)}%</td>
+                    <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${escapeHTML(completed)}</td>
+                </tr>`;
+            }).join('');
+        }
+
         function switchView(viewName) {
             if (window.matchMedia('(max-width: 767px)').matches) {
                 document.getElementById('mobile-nav-dropdown')?.classList.add('hidden');
             }
             if (viewName === 'progress' && currentProfile?.role === 'admin') return;
+            if (viewName === 'student-rank' && (!currentSession?.user || currentProfile?.role === 'admin')) return;
             if (viewName === 'admin' && currentProfile?.role !== 'admin') return;
             document.getElementById('view-dashboard').classList.add('hidden');
             document.getElementById('view-library').classList.add('hidden');
             document.getElementById('view-store').classList.add('hidden');
             document.getElementById('view-progress').classList.add('hidden');
+            document.getElementById('view-student-rank').classList.add('hidden');
             document.getElementById('view-player').classList.add('hidden');
             document.getElementById('view-result').classList.add('hidden');
             document.getElementById('view-admin').classList.add('hidden');
@@ -1210,6 +1306,10 @@
             } else if (viewName === 'progress') {
                 document.getElementById('view-progress').classList.remove('hidden');
                 renderProgressAnalytics();
+            } else if (viewName === 'student-rank') {
+                document.getElementById('view-student-rank').classList.remove('hidden');
+                populateStudentRankQuizSelect();
+                loadStudentRankList();
             } else if (viewName === 'player') {
                 document.getElementById('view-player').classList.remove('hidden');
             } else if (viewName === 'result') {
@@ -1484,10 +1584,8 @@
                     .from('quiz_attempts').select('id')
                     .eq('quiz_id', quizId).eq('user_id', currentSession.user.id).limit(1);
                 if (previousAttemptError) throw previousAttemptError;
-                if (previousAttempt?.length) {
-                    alert('ඔයා මේ Quiz එකට දැනටමත් උත්තර දීලා තියෙනවා. පළමු Attempt එකේ ප්‍රතිඵලය පමණයි ගණනය කරන්නේ.');
-                    return;
-                }
+                // A second or later attempt is allowed for practice, but it is never saved.
+                currentQuizIsRetake = !!previousAttempt?.length;
 
                 const { data: quizRow, error: quizError } = await supabaseClient
                     .from('quizzes').select('id,title,subject,batch,time_limit_seconds,is_published')
@@ -1715,24 +1813,55 @@
                 if (userAnswers[idx] !== null && userAnswers[idx] !== undefined) answerPayload[q.id] = userAnswers[idx];
             });
             try {
-                // The database checks the answer key and calculates the official score.
-                const { data: attemptId, error: submitError } = await supabaseClient.rpc('submit_quiz_attempt', {
-                    p_quiz_id: currentQuiz.id,
-                    p_answers: answerPayload,
-                    p_duration_seconds: quizDurationSeconds
-                });
-                if (submitError) throw submitError;
-                const { data: attempt, error: attemptError } = await supabaseClient
-                    .from('quiz_attempts').select('score,total_marks,percentage,completed_at')
-                    .eq('id', attemptId).single();
-                if (attemptError) throw attemptError;
-                const { data: answerRows, error: answerError } = await supabaseClient
-                    .from('quiz_answers').select('question_id,selected_option,is_correct,awarded_marks')
-                    .eq('attempt_id', attemptId);
-                if (answerError) throw answerError;
-                const resultByQuestion = new Map((answerRows || []).map(a => [a.question_id, a]));
-                const correctCount = (answerRows || []).filter(a => a.is_correct).length;
-                score = Number(attempt.percentage) || 0;
+                let resultByQuestion;
+                let correctCount;
+                let completedAt = Date.now();
+                const saveNote = document.getElementById('result-save-note');
+                if (currentQuizIsRetake) {
+                    // Practice attempts use the already-checked answer feedback in memory only.
+                    // No attempt or answer rows are written to Supabase.
+                    resultByQuestion = new Map();
+                    let earnedMarks = 0;
+                    const totalMarks = currentQuiz.questions.reduce((sum, q) => sum + (Number(q.points) || 1), 0);
+                    correctCount = 0;
+                    currentQuiz.questions.forEach((q, idx) => {
+                        const feedback = answerFeedback[idx];
+                        const isCorrect = !!feedback?.is_correct;
+                        const awardedMarks = isCorrect ? (Number(q.points) || 1) : 0;
+                        if (isCorrect) correctCount++;
+                        earnedMarks += awardedMarks;
+                        resultByQuestion.set(q.id, {
+                            is_correct: isCorrect,
+                            selected_option: userAnswers[idx],
+                            correct_option: feedback?.correct_option,
+                            awarded_marks: awardedMarks
+                        });
+                    });
+                    score = totalMarks ? Math.round((earnedMarks / totalMarks) * 100) : 0;
+                    if (saveNote) saveNote.classList.remove('hidden');
+                } else {
+                    // Only the first attempt is submitted to the database and used for ranking.
+                    const { data: attemptId, error: submitError } = await supabaseClient.rpc('submit_quiz_attempt', {
+                        p_quiz_id: currentQuiz.id,
+                        p_answers: answerPayload,
+                        p_duration_seconds: quizDurationSeconds
+                    });
+                    if (submitError) throw submitError;
+                    const { data: attempt, error: attemptError } = await supabaseClient
+                        .from('quiz_attempts').select('score,total_marks,percentage,completed_at')
+                        .eq('id', attemptId).single();
+                    if (attemptError) throw attemptError;
+                    const { data: answerRows, error: answerError } = await supabaseClient
+                        .from('quiz_answers').select('question_id,selected_option,is_correct,awarded_marks')
+                        .eq('attempt_id', attemptId);
+                    if (answerError) throw answerError;
+                    resultByQuestion = new Map((answerRows || []).map(a => [a.question_id, a]));
+                    correctCount = (answerRows || []).filter(a => a.is_correct).length;
+                    score = Number(attempt.percentage) || 0;
+                    completedAt = attempt.completed_at || Date.now();
+                    if (saveNote) saveNote.classList.add('hidden');
+                }
+
                 const m = Math.floor(quizDurationSeconds / 60);
                 const sec = quizDurationSeconds % 60;
                 const timeStr = `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
@@ -1740,7 +1869,7 @@
                 document.getElementById('result-correct').innerText = `${correctCount} / ${currentQuiz.questions.length}`;
                 document.getElementById('result-time').innerText = timeStr;
                 document.getElementById('report-quiz-title').innerText = currentQuiz.title;
-                document.getElementById('report-date').innerText = new Date(attempt.completed_at || Date.now()).toISOString().split('T')[0];
+                document.getElementById('report-date').innerText = new Date(completedAt).toISOString().split('T')[0];
                 document.getElementById('report-score-badge').innerText = `Score: ${score}%`;
                 const reportList = document.getElementById('report-questions-list');
                 reportList.innerHTML = '';
@@ -1759,7 +1888,7 @@
                             <div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-xs text-amber-900 dark:text-amber-200 sinhala-text"><strong>විවරණය:</strong> ${q.explanation || 'විවරණයක් නැත.'}</div>
                         </div>`;
                 });
-                await loadStudentHistory();
+                if (!currentQuizIsRetake) await loadStudentHistory();
                 switchView('result');
             } catch (error) {
                 console.error('Quiz submission error:', error);
@@ -1769,7 +1898,12 @@
         }
 
         function restartCurrentQuiz() {
-            alert('මෙම Quiz එකට එක් වරක් පමණයි උත්තර දිය හැක්කේ. පළමු Attempt එකේ ප්‍රතිඵලය පමණක් සුරැකේ.');
+            if (currentQuiz?.id) {
+                const quizId = currentQuiz.id;
+                switchView('library');
+                startQuiz(quizId);
+                return;
+            }
             switchView('library');
         }
 
