@@ -10,6 +10,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- MathJax: render LaTeX chemistry and mathematical notation -->
+    <script>
+        window.MathJax = {
+            loader: { load: ['[tex]/mhchem'] },
+            tex: {
+                packages: { '[+]': ['mhchem'] },
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' },
+            startup: { typeset: false }
+        };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -1594,6 +1609,16 @@
             return html;
         }
 
+        function typesetMathIn(element) {
+            if (!element || !window.MathJax?.typesetPromise) return;
+            window.MathJax.startup.promise
+                .then(() => {
+                    window.MathJax.typesetClear([element]);
+                    return window.MathJax.typesetPromise([element]);
+                })
+                .catch(error => console.warn('MathJax rendering error:', error));
+        }
+
         function loadQuestion() {
             let q = currentQuiz.questions[currentQuestionIndex];
             document.getElementById('question-counter').innerText = `Question ${currentQuestionIndex + 1} of ${currentQuiz.questions.length}`;
@@ -1637,6 +1662,10 @@
                     </button>
                 `;
             });
+
+            // Render LaTeX formulas in the question and answer options.
+            typesetMathIn(document.getElementById('question-text'));
+            typesetMathIn(optsContainer);
 
             // Explanations are shown only in the result report, after database scoring.
             document.getElementById('explanation-box').classList.add('hidden');
@@ -1739,6 +1768,8 @@
                             <div class="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-xs text-amber-900 dark:text-amber-200 sinhala-text"><strong>විවරණය:</strong> ${q.explanation || 'විවරණයක් නැත.'}</div>
                         </div>`;
                 });
+                // Render formulas in the completed quiz report as well.
+                typesetMathIn(reportList);
                 await loadStudentHistory();
                 switchView('result');
             } catch (error) {
