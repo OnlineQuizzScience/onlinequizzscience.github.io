@@ -1126,7 +1126,10 @@
                 renderLibrary();
             } else if (viewName === 'store') {
                 document.getElementById('view-store').classList.remove('hidden');
-                renderStore();
+                loadPublishedBooks().then(() => renderStore()).catch(error => {
+                    console.error('Book store load:', error);
+                    document.getElementById('store-books-grid').innerHTML = `<div class="col-span-3 text-center py-12 text-rose-500 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">Could not load books: ${escapeHTML(error.message || 'Unknown database error')}</div>`;
+                });
             } else if (viewName === 'progress') {
                 document.getElementById('view-progress').classList.remove('hidden');
                 renderProgressAnalytics();
@@ -1197,6 +1200,37 @@
             });
         }
 
+        async function loadPublishedBooks() {
+            if (!currentSession?.user) {
+                books = [];
+                throw new Error('Please log in to view the Book Store.');
+            }
+
+            const { data, error } = await supabaseClient
+                .from('books')
+                .select('*')
+                .eq('is_published', true)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Published books query failed:', error);
+                throw error;
+            }
+
+            // Convert Supabase column names to the fields used by the existing store UI.
+            books = (data || []).map(book => ({
+                id: book.id,
+                title: book.title || 'Untitled book',
+                subject: book.subject || 'General',
+                year: String(book.year || '2027'),
+                price: Number(book.price) || 0,
+                cover: book.cover_url || book.cover || '',
+                description: book.description || '',
+                author: book.author || '',
+                fileUrl: book.file_url || ''
+            }));
+        }
+
         function renderStore() {
             let search = document.getElementById('store-search').value.toLowerCase();
             let yearFilter = document.getElementById('store-year-filter').value;
@@ -1204,8 +1238,8 @@
             grid.innerHTML = '';
 
             let filtered = books.filter(b => {
-                let matchTitle = b.title.toLowerCase().includes(search) || b.description.toLowerCase().includes(search) || b.subject.toLowerCase().includes(search);
-                let matchYear = (yearFilter === 'All' || b.year === yearFilter);
+                let matchTitle = String(b.title || '').toLowerCase().includes(search) || String(b.description || '').toLowerCase().includes(search) || String(b.subject || '').toLowerCase().includes(search);
+                let matchYear = (yearFilter === 'All' || String(b.year || '') === yearFilter);
                 return matchTitle && matchYear;
             });
 
@@ -1215,25 +1249,30 @@
             }
 
             filtered.forEach(book => {
+                let safeTitle = escapeHTML(book.title);
+                let safeSubject = escapeHTML(book.subject);
+                let safeYear = escapeHTML(book.year);
+                let safeDescription = escapeHTML(book.description);
+                let safePrice = escapeHTML(book.price);
                 let defaultCover = 'https://placehold.co/400x300/e0e7ff/4f46e5?text=' + encodeURIComponent(book.title);
-                let coverImg = (book.cover && book.cover.trim() !== '') ? book.cover : defaultCover;
+                let coverImg = (book.cover && String(book.cover).trim() !== '') ? escapeHTML(book.cover) : defaultCover;
 
                 grid.innerHTML += `
                     <div class="bg-white dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex flex-col justify-between">
                         <div>
-                            <img src="${coverImg}" alt="${book.title}" class="w-full h-48 object-cover bg-slate-100 dark:bg-slate-700" onerror="this.src='https://placehold.co/400x300/e0e7ff/4f46e5?text=Science+Book'">
+                            <img src="${coverImg}" alt="${safeTitle}" class="w-full h-48 object-cover bg-slate-100 dark:bg-slate-700" onerror="this.src='https://placehold.co/400x300/e0e7ff/4f46e5?text=Science+Book'">
                             <div class="p-5 space-y-2">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs font-bold px-2.5 py-1 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-md">${book.subject}</span>
-                                    <span class="text-xs font-bold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-md">A/L ${book.year}</span>
+                                    <span class="text-xs font-bold px-2.5 py-1 bg-brand-50 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-md">${safeSubject}</span>
+                                    <span class="text-xs font-bold px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-md">A/L ${safeYear}</span>
                                 </div>
-                                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">${book.title}</h3>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">${book.description}</p>
+                                <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">${safeTitle}</h3>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">${safeDescription}</p>
                             </div>
                         </div>
                         <div class="p-5 pt-0 flex items-center justify-between border-t border-slate-100 dark:border-slate-700 mt-4">
-                            <span class="text-lg font-extrabold text-brand-600 dark:text-brand-400">LKR ${book.price}</span>
-                            <button onclick="alert('Order request received for ${book.title}! Our team will contact you.')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition">
+                            <span class="text-lg font-extrabold text-brand-600 dark:text-brand-400">LKR ${safePrice}</span>
+                            <button onclick="alert('Order request received for ${safeTitle}! Our team will contact you.')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition">
                                 <i class="fa-solid fa-cart-shopping mr-1"></i> Order Book
                             </button>
                         </div>
