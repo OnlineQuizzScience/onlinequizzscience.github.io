@@ -58,7 +58,7 @@
         }
     </style>
 </head>
-<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200" onload="checkAuthSession()">
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200" onload="initTheme(); checkAuthSession()">
 
     <!-- AUTHENTICATION WRAPPER (LOGIN / SIGNUP / OTP) -->
     <div id="auth-container" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
@@ -527,7 +527,7 @@
                     <button onclick="window.print()" class="px-5 py-3 bg-slate-700 hover:bg-slate-800 text-white font-semibold rounded-xl shadow-md transition flex items-center gap-2">
                         <i class="fa-solid fa-print"></i> Print Report View
                     </button>
-                    <button onclick="restartCurrentQuiz()" class="px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md transition">
+                    <button id="result-retry-button" onclick="restartCurrentQuiz()" class="hidden px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl shadow-md transition">
                         <i class="fa-solid fa-rotate-right mr-2"></i> Try Again
                     </button>
                     <button onclick="switchView('library')" class="px-5 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-xl transition">
@@ -565,9 +565,10 @@
                 </div>
 
                 <!-- Tabs to Switch between Quiz Creator and Book Publisher -->
-                <div class="flex space-x-2 border-b border-slate-200 dark:border-slate-700 pb-3">
+                <div class="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-700 pb-3">
                     <button onclick="switchAdminTab('quiz')" id="admin-tab-quiz" class="px-4 py-2 font-bold text-sm bg-brand-600 text-white rounded-xl shadow">Quiz Creator</button>
                     <button onclick="switchAdminTab('book')" id="admin-tab-book" class="px-4 py-2 font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl">Publish Book / Store Item</button>
+                    <button onclick="switchAdminTab('rank')" id="admin-tab-rank" class="px-4 py-2 font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl"><i class="fa-solid fa-ranking-star mr-1"></i> Rank List</button>
                 </div>
 
                 <!-- QUIZ CREATOR FORM -->
@@ -744,6 +745,36 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- ADMIN RANK LIST -->
+                <div id="admin-form-rank" class="space-y-5 hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+                        <div class="flex-1">
+                            <label for="admin-rank-quiz-select" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Select Quiz</label>
+                            <select id="admin-rank-quiz-select" onchange="loadAdminRankList()" class="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-brand-500 outline-none">
+                                <option value="">Select a quiz</option>
+                            </select>
+                        </div>
+                        <button onclick="loadAdminRankList()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl"><i class="fa-solid fa-rotate mr-1"></i> Refresh</button>
+                    </div>
+                    <div id="admin-rank-summary" class="text-sm text-slate-500 dark:text-slate-400">Select a quiz to view its ranking.</div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 dark:bg-slate-900/60 text-xs uppercase text-slate-500 dark:text-slate-400">
+                                <tr>
+                                    <th class="px-4 py-3">Rank</th>
+                                    <th class="px-4 py-3">Student</th>
+                                    <th class="px-4 py-3">Score</th>
+                                    <th class="px-4 py-3">Percentage</th>
+                                    <th class="px-4 py-3">Completed</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-rank-rows" class="divide-y divide-slate-100 dark:divide-slate-700">
+                                <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Select a quiz to view its ranking.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             <!-- Quiz Management Section -->
@@ -832,7 +863,7 @@
         async function loadCurrentProfile() {
             if (!currentSession?.user) return null;
             const { data, error } = await supabaseClient
-                .from('profiles').select('id,full_name,username,role')
+                .from('profiles').select('id,full_name,username,role,theme')
                 .eq('id', currentSession.user.id).single();
             if (error) {
                 console.error('Profile load:', error.message);
@@ -841,6 +872,7 @@
                 return null;
             }
             currentProfile = data;
+            if (data.theme === 'dark' || data.theme === 'light') applyTheme(data.theme, false);
             setAdminVisibility(data.role === 'admin');
             return data;
         }
@@ -1021,26 +1053,28 @@
             if (!session) { currentProfile = null; setAdminVisibility(false); }
         });
 
-        function initTheme() {
-            const savedTheme = localStorage.getItem('proquiz_theme');
-            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-                document.getElementById('theme-icon').className = 'fa-solid fa-sun';
-            } else {
-                document.documentElement.classList.remove('dark');
-                document.getElementById('theme-icon').className = 'fa-solid fa-moon';
-            }
+        function applyTheme(theme, persistLocally = true) {
+            const isDark = theme === 'dark';
+            document.documentElement.classList.toggle('dark', isDark);
+            const icon = document.getElementById('theme-icon');
+            if (icon) icon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+            if (persistLocally) localStorage.setItem('proquiz_theme', theme);
         }
 
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('proquiz_theme', 'light');
-                document.getElementById('theme-icon').className = 'fa-solid fa-moon';
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('proquiz_theme', 'dark');
-                document.getElementById('theme-icon').className = 'fa-solid fa-sun';
+        function initTheme() {
+            const savedTheme = localStorage.getItem('proquiz_theme');
+            const preferred = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(preferred, false);
+        }
+
+        async function toggleTheme() {
+            const nextTheme = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+            applyTheme(nextTheme, true);
+            if (!currentSession?.user) return;
+            const { error } = await supabaseClient.rpc('set_my_theme', { p_theme: nextTheme });
+            if (error) {
+                console.error('Could not save theme online:', error.message);
+                alert('Theme changed on this device, but online saving failed. Please run the supplied SQL setup once.');
             }
         }
 
@@ -1060,17 +1094,87 @@
         }
 
         function switchAdminTab(tab) {
-            if (tab === 'quiz') {
-                document.getElementById('admin-form-quiz').classList.remove('hidden');
-                document.getElementById('admin-form-book').classList.add('hidden');
-                document.getElementById('admin-tab-quiz').className = 'px-4 py-2 font-bold text-sm bg-brand-600 text-white rounded-xl shadow';
-                document.getElementById('admin-tab-book').className = 'px-4 py-2 font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl';
-            } else {
-                document.getElementById('admin-form-quiz').classList.add('hidden');
-                document.getElementById('admin-form-book').classList.remove('hidden');
-                document.getElementById('admin-tab-quiz').className = 'px-4 py-2 font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl';
-                document.getElementById('admin-tab-book').className = 'px-4 py-2 font-bold text-sm bg-brand-600 text-white rounded-xl shadow';
+            const tabs = ['quiz', 'book', 'rank'];
+            tabs.forEach(name => {
+                document.getElementById(`admin-form-${name}`).classList.toggle('hidden', name !== tab);
+                document.getElementById(`admin-tab-${name}`).className = name === tab
+                    ? 'px-4 py-2 font-bold text-sm bg-brand-600 text-white rounded-xl shadow'
+                    : 'px-4 py-2 font-bold text-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl';
+            });
+            if (tab === 'rank') {
+                populateAdminRankQuizSelect();
+                loadAdminRankList();
             }
+        }
+
+        function populateAdminRankQuizSelect() {
+            const select = document.getElementById('admin-rank-quiz-select');
+            if (!select) return;
+            const previous = select.value;
+            select.innerHTML = '<option value="">Select a quiz</option>' + (adminQuizRows || []).map(q =>
+                `<option value="${q.id}">${escapeHTML(q.title)} · ${escapeHTML(q.subject)} · A/L ${escapeHTML(q.batch)}</option>`
+            ).join('');
+            if (previous && (adminQuizRows || []).some(q => q.id === previous)) select.value = previous;
+            else if (adminQuizRows?.length) select.value = adminQuizRows[0].id;
+        }
+
+        async function loadAdminRankList() {
+            if (!(await requireAdmin())) return;
+            const select = document.getElementById('admin-rank-quiz-select');
+            const rowsBox = document.getElementById('admin-rank-rows');
+            const summary = document.getElementById('admin-rank-summary');
+            if (!select || !rowsBox || !summary) return;
+
+            if (!adminQuizRows?.length) {
+                populateAdminRankQuizSelect();
+                rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No quizzes available.</td></tr>';
+                summary.textContent = 'There are no quizzes to display.';
+                return;
+            }
+            if (!select.value) populateAdminRankQuizSelect();
+            const quizId = select.value;
+            if (!quizId) {
+                rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Select a quiz to view its ranking.</td></tr>';
+                summary.textContent = 'Select a quiz to view its ranking.';
+                return;
+            }
+
+            rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Loading rank list...</td></tr>';
+            summary.textContent = 'Loading student results...';
+            const { data, error } = await supabaseClient
+                .from('quiz_best_scores')
+                .select('rank,user_id,full_name,score,total_marks,percentage,completed_at')
+                .eq('quiz_id', quizId)
+                .order('rank', {ascending:true})
+                .order('score', {ascending:false})
+                .order('percentage', {ascending:false});
+
+            if (error) {
+                rowsBox.innerHTML = `<tr><td colspan="5" class="px-4 py-6 text-center text-rose-500">Could not load rank list: ${escapeHTML(error.message)}</td></tr>`;
+                summary.textContent = 'Rank list could not be loaded.';
+                return;
+            }
+
+            const rankRows = data || [];
+            summary.textContent = `${rankRows.length} student(s) · Best attempt per student`;
+            if (!rankRows.length) {
+                rowsBox.innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">No students have completed this quiz yet.</td></tr>';
+                return;
+            }
+
+            rowsBox.innerHTML = rankRows.map(row => {
+                const completed = row.completed_at
+                    ? new Date(row.completed_at).toLocaleString()
+                    : '—';
+                const rankLabel = Number(row.rank) === 1 ? '🥇 1' : Number(row.rank) === 2 ? '🥈 2' : Number(row.rank) === 3 ? '🥉 3' : row.rank;
+                return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40">
+                    <td class="px-4 py-3 font-bold whitespace-nowrap">${rankLabel}</td>
+                    <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">${escapeHTML(row.full_name || 'Student')}</td>
+                    <td class="px-4 py-3 whitespace-nowrap">${escapeHTML(row.score)} / ${escapeHTML(row.total_marks)}</td>
+                    <td class="px-4 py-3 font-bold whitespace-nowrap">${escapeHTML(row.percentage)}%</td>
+                    <td class="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">${escapeHTML(completed)}</td>
+                </tr>`;
+            }).join('');
         }
 
         function switchView(viewName) {
@@ -1376,6 +1480,15 @@
                 return;
             }
             try {
+                const { data: previousAttempt, error: previousAttemptError } = await supabaseClient
+                    .from('quiz_attempts').select('id')
+                    .eq('quiz_id', quizId).eq('user_id', currentSession.user.id).limit(1);
+                if (previousAttemptError) throw previousAttemptError;
+                if (previousAttempt?.length) {
+                    alert('ඔයා මේ Quiz එකට දැනටමත් උත්තර දීලා තියෙනවා. පළමු Attempt එකේ ප්‍රතිඵලය පමණයි ගණනය කරන්නේ.');
+                    return;
+                }
+
                 const { data: quizRow, error: quizError } = await supabaseClient
                     .from('quizzes').select('id,title,subject,batch,time_limit_seconds,is_published')
                     .eq('id', quizId).eq('is_published', true).single();
@@ -1656,7 +1769,8 @@
         }
 
         function restartCurrentQuiz() {
-            startQuiz(currentQuiz.id);
+            alert('මෙම Quiz එකට එක් වරක් පමණයි උත්තර දිය හැක්කේ. පළමු Attempt එකේ ප්‍රතිඵලය පමණක් සුරැකේ.');
+            switchView('library');
         }
 
         function downloadPDFReport() {
@@ -1802,6 +1916,7 @@
             if (quizResult.error) quizBox.innerHTML = `<p class="text-sm text-rose-500">Quiz load failed: ${escapeHTML(quizResult.error.message)}</p>`;
             else {
                 adminQuizRows = quizResult.data || [];
+                populateAdminRankQuizSelect();
                 quizBox.innerHTML = adminQuizRows.length ? adminQuizRows.map(q => `
                     <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div><p class="font-bold text-sm">${escapeHTML(q.title)}</p><p class="text-xs text-slate-500">${escapeHTML(q.subject)} · A/L ${escapeHTML(q.batch)} · ${(q.questions||[]).length} questions · ${q.is_published?'Published':'Draft'}</p></div>
@@ -1850,13 +1965,21 @@
 
         async function deleteQuiz(id) {
             if (!(await requireAdmin())) return;
-            const { count, error: countError } = await supabaseClient.from('quiz_attempts').select('id',{count:'exact',head:true}).eq('quiz_id',id);
-            if (countError) return alert(countError.message);
-            if (count > 0) return alert('This quiz has student attempts. It cannot be deleted because result history must be preserved. You can unpublish it in Supabase for now.');
-            if (!confirm('Delete this quiz and its questions?')) return;
-            const { error } = await supabaseClient.from('quizzes').delete().eq('id',id);
-            if (error) return alert('Delete failed: '+error.message);
+            const quiz = adminQuizRows.find(q => q.id === id);
+            const quizTitle = quiz?.title || 'this quiz';
+            if (!confirm(`Delete "${quizTitle}" permanently? This will also delete all student attempts and submitted answers for this quiz. This action cannot be undone.`)) return;
+
+            const { error } = await supabaseClient.rpc('admin_delete_quiz', {
+                p_quiz_id: id
+            });
+            if (error) return alert('Delete failed: ' + error.message);
+
+            if (editingQuizId === id) resetQuizBuilder();
             await renderManageQuizzesList();
+            await loadPublishedQuizzes();
+            updateDashboardCounts();
+            await renderLibrary();
+            alert('Quiz and its student attempt history deleted successfully.');
         }
 
         async function deleteBook(id) {
